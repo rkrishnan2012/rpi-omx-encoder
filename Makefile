@@ -1,44 +1,29 @@
-ALL_PROGS = v4l2copy v4l2compress_vpx v4l2compress_h264 v4l2convert_yuv 
 CFLAGS = -W -Wall -pthread -g -pipe $(CFLAGS_EXTRA) -I include
 RM = rm -rf
-CC = g++
+CC = arm-unknown-linux-gnueabi-g++
 
-# log4cpp
-LDFLAGS += -llog4cpp 
+CFLAGS+=-I/home/rohit/nasa/cross/include
+LDFLAGS+=-L/home/rohit/nasa/cross/lib
+
 # v4l2wrapper
 CFLAGS += -I v4l2wrapper/inc
 
 .DEFAULT_GOAL := all
 
 # raspberry tools using ilclient
-ILCLIENTDIR=/opt/vc/src/hello_pi/libs/ilclient
-ifneq ($(wildcard $(ILCLIENTDIR)),)
-CFLAGS  +=-I /opt/vc/include/ -I /opt/vc/include/interface/vcos/ -I /opt/vc/include/interface/vcos/pthreads/ -I /opt/vc/include/interface/vmcs_host/linux/ -I $(ILCLIENTDIR) 
+ILCLIENTDIR=/home/rohit/nasa/cross/hello_pi/libs/ilclient
+
+CFLAGS  +=-I /home/rohit/nasa/cross/include/interface/vcos/ -I /home/rohit/nasa/cross/include/interface/vcos/pthreads/ -I /home/rohit/nasa/cross/include/interface/vmcs_host/linux/ -I $(ILCLIENTDIR) 
 CFLAGS  += -DOMX_SKIP64BIT
-LDFLAGS +=-L /opt/vc/lib -L $(ILCLIENTDIR) -lpthread -lopenmaxil -lbcm_host -lvcos -lvchiq_arm
+LDFLAGS +=-L $(ILCLIENTDIR) -lpthread -lopenmaxil -lbcm_host -lvcos -lvchiq_arm /home/rohit/nasa/cross/lib/liblog4cpp.a
 
-v4l2compress_omx: src/encode_omx.cpp src/v4l2compress_omx.cpp $(ILCLIENTDIR)/libilclient.a libv4l2wrapper.a 
+v4l2compress_omx: /home/rohit/nasa/cross/lib/liblog4cpp.a src/encode_omx.cpp src/v4l2compress_omx.cpp  $(ILCLIENTDIR)/libilclient.a libv4l2wrapper.a 
 	$(CC) -o $@ $^ -DHAVE_LIBBCM_HOST -DUSE_EXTERNAL_LIBBCM_HOST -DUSE_VCHIQ_ARM -Wno-psabi $(CFLAGS) $(LDFLAGS) 
-
-v4l2grab_h264: src/encode_omx.cpp src/v4l2grab_h264.cpp $(ILCLIENTDIR)/libilclient.a libv4l2wrapper.a
-	$(CC) -o $@ $^ -DHAVE_LIBBCM_HOST -DUSE_EXTERNAL_LIBBCM_HOST -DUSE_VCHIQ_ARM -Wno-psabi $(CFLAGS) $(LDFLAGS) 
-
-v4l2display_h264: src/v4l2display_h264.cpp $(ILCLIENTDIR)/libilclient.a libv4l2wrapper.a
-	$(CC) -o $@ $^ -DHAVE_LIBBCM_HOST -DUSE_EXTERNAL_LIBBCM_HOST -DUSE_VCHIQ_ARM -Wno-psabi $(CFLAGS) $(LDFLAGS) 
-
 
 $(ILCLIENTDIR)/libilclient.a:
 	make -C $(ILCLIENTDIR)
 	
-ALL_PROGS+=v4l2grab_h264
-ALL_PROGS+=v4l2display_h264
 ALL_PROGS+=v4l2compress_omx
-endif
-
-# opencv
-ifneq ($(wildcard /usr/include/opencv),)
-ALL_PROGS+=v4l2detect_yuv
-endif
 
 all: $(ALL_PROGS)
 
@@ -56,25 +41,6 @@ libv4l2wrapper.a:
 	mv v4l2wrapper/libv4l2wrapper.a .
 	make -C v4l2wrapper clean
 
-# read V4L2 capture -> write V4L2 output
-v4l2copy: src/v4l2copy.cpp  libv4l2wrapper.a
-	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
-
-# read V4L2 capture -> convert YUV format -> write V4L2 output
-v4l2convert_yuv: src/v4l2convert_yuv.cpp  libyuv.a libv4l2wrapper.a
-	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS) -I libyuv/include
-
-# read V4L2 capture -> compress using libvpx -> write V4L2 output
-v4l2compress_vpx: src/v4l2compress_vpx.cpp libyuv.a  libv4l2wrapper.a
-	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS) -lvpx -I libyuv/include
-
-# read V4L2 capture -> compress using x264 -> write V4L2 output
-v4l2compress_h264: src/v4l2compress_h264.cpp libyuv.a  libv4l2wrapper.a
-	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS) -lx264 -I libyuv/include
-
-v4l2detect_yuv: src/v4l2detect_yuv.cpp libyuv.a  libv4l2wrapper.a
-	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS) -lopencv_core -lopencv_objdetect -lopencv_imgproc -I libyuv/include
-	
 	
 upgrade:
 	git submodule foreach git pull origin master
